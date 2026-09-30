@@ -1,0 +1,84 @@
+name: CI/CD – exdev-iam-service
+
+on:
+  push:
+    branches: [develop, master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+  deploy-staging:
+    if: github.ref_name == 'develop'
+    needs: build-and-push
+    runs-on: [self-hosted, staging]
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_DIR=/opt/exdev-iam-service
+          mkdir -p "$APP_DIR"
+          cp docker-compose.yml "$APP_DIR/docker-compose.yml"
+          export IMAGE_TAG=develop
+          docker compose -f "$APP_DIR/docker-compose.yml" pull
+          docker compose -f "$APP_DIR/docker-compose.yml" up -d --remove-orphans
+          docker image prune -f
+
+  deploy-production:
+    if: github.ref_name == 'master'
+    needs: build-and-push
+    runs-on: [self-hosted, production]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy production
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_DIR=/opt/exdev-iam-service
+          mkdir -p "$APP_DIR"
+          cp docker-compose.yml "$APP_DIR/docker-compose.yml"
+          export IMAGE_TAG=master
+          docker compose -f "$APP_DIR/docker-compose.yml" pull
+          docker compose -f "$APP_DIR/docker-compose.yml" up -d --remove-orphans
+          docker image prune -f
