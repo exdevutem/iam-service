@@ -25,6 +25,10 @@ export class AuthService {
     private readonly google: GoogleIdentityService,
     private readonly policies: ApplicationPolicyService,
   ) {}
+  async suspend(userId: string) {
+    const app = await this.policies.application();
+    await this.repository.suspend(app.id, userId);
+  }
   async login() {
     const app = await this.policies.application();
     const state = randomToken(),
@@ -120,6 +124,19 @@ export class AuthService {
       expiresAt: session.expires_at,
     };
   }
+  async validateRequest(
+    token: string,
+    mutation?: { csrf?: string; origin?: string },
+  ) {
+    if (
+      mutation &&
+      (mutation.origin !== this.settings.frontendOrigin ||
+        !mutation.csrf ||
+        !sameToken(mutation.csrf, csrfToken(token, this.settings.key)))
+    )
+      throw new ForbiddenException('CSRF_INVALID');
+    return this.current(token);
+  }
   async csrf(token: string | undefined) {
     await this.current(token);
     return { csrfToken: csrfToken(token!, this.settings.key) };
@@ -132,7 +149,7 @@ export class AuthService {
   ) {
     this.settings.requireEnabled();
     if (
-      origin !== this.settings.origin ||
+      origin !== this.settings.frontendOrigin ||
       !isToken(token) ||
       !csrf ||
       !sameToken(csrf, csrfToken(token, this.settings.key))

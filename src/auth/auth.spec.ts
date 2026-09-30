@@ -253,3 +253,75 @@ describe('Auth configuration', () => {
       }),
     ).toThrow());
 });
+
+describe('Rafael frontend integration', () => {
+  it('accepts only the configured local frontend origin', () => {
+    const config = new ConfigService({
+      AUTH_ORIGIN: 'http://localhost:3002',
+      AUTH_FRONTEND_ORIGIN: 'http://localhost:3000',
+      NODE_ENV: 'development',
+    });
+    expect(new AuthSettings(config).frontendOrigin).toBe(
+      'http://localhost:3000',
+    );
+    for (const origin of [
+      'https://evil.example',
+      'http://127.0.0.1:3000',
+      'http://localhost:3000/path',
+    ])
+      expect(
+        () =>
+          new AuthSettings(
+            new ConfigService({
+              AUTH_ORIGIN: 'http://localhost:3002',
+              AUTH_FRONTEND_ORIGIN: origin,
+              NODE_ENV: 'development',
+            }),
+          ).frontendOrigin,
+      ).toThrow();
+  });
+  it('rejects cross-origin configuration in production', () => {
+    expect(
+      () =>
+        new AuthSettings(
+          new ConfigService({
+            AUTH_ORIGIN: 'https://rafael.exdev.cl',
+            AUTH_FRONTEND_ORIGIN: 'https://other.exdev.cl',
+            NODE_ENV: 'production',
+          }),
+        ).frontendOrigin,
+    ).toThrow();
+  });
+  it('validates CSRF and origin before a private mutation', async () => {
+    const token = randomToken();
+    const service = new AuthService(
+      settings,
+      {} as AuthRepository,
+      {} as GoogleIdentityService,
+      {} as ApplicationPolicyService,
+    );
+    const current = jest.spyOn(service, 'current').mockResolvedValue({
+      user: { id: 'u' },
+      member: { id: '1' },
+      application: 'rafael',
+      access: 'enabled',
+      permissions: [],
+      expiresAt: new Date(),
+    });
+    await expect(
+      service.validateRequest(token, {
+        csrf: csrfToken(token, key),
+        origin: settings.origin,
+      }),
+    ).resolves.toBeDefined();
+    for (const mutation of [
+      { origin: settings.origin },
+      { csrf: 'bad', origin: settings.origin },
+      { csrf: csrfToken(token, key), origin: 'https://evil.example' },
+    ])
+      await expect(service.validateRequest(token, mutation)).rejects.toThrow(
+        'CSRF_INVALID',
+      );
+    expect(current).toHaveBeenCalledTimes(1);
+  });
+});

@@ -150,6 +150,26 @@ export class AuthRepository {
     );
     return result.rows.map((row) => row.codigo);
   }
+  async suspend(appId: string, userId: string) {
+    await this.db.transaction(async (client) => {
+      await client.query(
+        'SELECT id FROM public.applications WHERE id=$1 FOR UPDATE',
+        [appId],
+      );
+      await client.query(
+        "UPDATE public.application_access SET estado='suspendido' WHERE application_id=$1 AND user_id=$2",
+        [appId, userId],
+      );
+      await client.query(
+        'UPDATE public.sessions SET revoked_at=clock_timestamp() WHERE application_id=$1 AND user_id=$2 AND revoked_at IS NULL',
+        [appId, userId],
+      );
+      await client.query(
+        "INSERT INTO public.audit_events(application_id,actor_service,action,target_type,target_id,resultado) VALUES($1,'business-api','access.suspended','user',$2,'exito')",
+        [appId, userId],
+      );
+    });
+  }
   async revoke(appId: string, token: string, all: boolean) {
     await this.db.transaction(async (client) => {
       const session = await client.query<{ id: string; user_id: string }>(

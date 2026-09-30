@@ -1,3 +1,4 @@
+import { AuthSettings } from '../auth/auth.settings';
 import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
@@ -6,6 +7,14 @@ import helmet from 'helmet';
 import { HttpExceptionFilter } from '../common/http-exception.filter';
 
 export function configureApp(app: NestExpressApplication) {
+  const settings = app.get(AuthSettings);
+  if (settings.enabled)
+    app.enableCors({
+      origin: settings.frontendOrigin,
+      credentials: true,
+      methods: ['GET', 'POST', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
+    });
   app.disable('x-powered-by');
   app.use(helmet());
   app.use((_req: Request, res: Response, next: NextFunction) => {

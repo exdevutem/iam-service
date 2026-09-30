@@ -13,6 +13,25 @@ export class AuthSettings {
   get origin() {
     return this.config.get<string>('AUTH_ORIGIN', '');
   }
+  get frontendOrigin() {
+    const configured = this.config.get<string>(
+      'AUTH_FRONTEND_ORIGIN',
+      this.origin,
+    );
+    const target = new URL(configured);
+    const source = new URL(this.origin);
+    const local =
+      this.config.get<string>('NODE_ENV') !== 'production' &&
+      source.protocol === 'http:' &&
+      target.protocol === 'http:' &&
+      source.hostname === target.hostname &&
+      ['localhost', '127.0.0.1'].includes(source.hostname);
+    if (target.origin !== configured || (configured !== this.origin && !local))
+      throw new Error(
+        'AUTH_FRONTEND_ORIGIN debe coincidir con AUTH_ORIGIN, excepto puertos locales',
+      );
+    return configured;
+  }
   get redirectUri() {
     return `${this.origin}/auth/callback`;
   }
@@ -96,10 +115,6 @@ export function validateAuthEnvironment(input: Record<string, unknown>) {
     members.hash
   )
     throw new Error('DATABASE_URL invalida');
-  if (
-    !['disable', 'verify-full'].includes(
-      text('DATABASE_SSL', 'disable'),
-    )
-  )
+  if (!['disable', 'verify-full'].includes(text('DATABASE_SSL', 'disable')))
     throw new Error('DATABASE_SSL invalido');
 }

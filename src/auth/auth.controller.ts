@@ -51,18 +51,17 @@ export class AuthController {
       );
       if (result.pending) {
         res.clearCookie(this.settings.sessionCookie, this.cookieOptions());
-        res.status(403).json({
-          code: 'ACCESS_PENDING',
-          message:
-            'Cuenta institucional verificada. Falta vincular y habilitar el acceso.',
-        });
+        res.redirect(
+          303,
+          `${this.settings.frontendOrigin}/?auth=ACCESS_PENDING`,
+        );
         return;
       }
       res.cookie(this.settings.sessionCookie, result.token, {
         ...this.cookieOptions(),
         maxAge: 8 * 60 * 60 * 1000,
       });
-      res.redirect(303, '/auth/me');
+      res.redirect(303, `${this.settings.frontendOrigin}/`);
     } catch (error) {
       res.clearCookie(this.settings.sessionCookie, this.cookieOptions());
       throw error;
