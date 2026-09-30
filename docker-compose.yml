@@ -1,9 +1,10 @@
 services:
   exdev-iam-service:
-    image: ghcr.io/exdevutem/exdev-iam-service:${IMAGE_TAG:-latest}
+    image: ghcr.io/exdevutem/iam-service:${IMAGE_TAG:-latest}
     container_name: exdev-iam-service
     restart: unless-stopped
     ports:
       - "3002:3002"
     env_file:
       - /opt/exdev-iam-service/.env
+
