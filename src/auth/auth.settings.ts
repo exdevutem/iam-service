@@ -13,24 +13,29 @@ export class AuthSettings {
   get origin() {
     return this.config.get<string>('AUTH_ORIGIN', '');
   }
-  get frontendOrigin() {
+  get frontendOrigins() {
     const configured = this.config.get<string>(
-      'AUTH_FRONTEND_ORIGIN',
-      this.origin,
+      'AUTH_ORIGINS',
+      this.config.get<string>('AUTH_FRONTEND_ORIGIN', this.origin),
     );
-    const target = new URL(configured);
-    const source = new URL(this.origin);
-    const local =
-      this.config.get<string>('NODE_ENV') !== 'production' &&
-      source.protocol === 'http:' &&
-      target.protocol === 'http:' &&
-      source.hostname === target.hostname &&
-      ['localhost', '127.0.0.1'].includes(source.hostname);
-    if (target.origin !== configured || (configured !== this.origin && !local))
-      throw new Error(
-        'AUTH_FRONTEND_ORIGIN debe coincidir con AUTH_ORIGIN, excepto puertos locales',
-      );
-    return configured;
+    const origins = configured
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (origins.length === 0)
+      throw new Error('AUTH_ORIGINS requiere al menos un origen');
+    for (const value of origins) {
+      const target = new URL(value);
+      if (target.origin !== value || !['http:', 'https:'].includes(target.protocol))
+        throw new Error('AUTH_ORIGINS contiene un origen invalido');
+      if (this.config.get<string>('NODE_ENV') === 'production' && target.protocol !== 'https:')
+        throw new Error('AUTH_ORIGINS requiere HTTPS en produccion');
+    }
+    return origins;
+  }
+
+  get frontendOrigin() {
+    return this.frontendOrigins[0];
   }
   get redirectUri() {
     return `${this.origin}/auth/callback`;
@@ -118,3 +123,4 @@ export function validateAuthEnvironment(input: Record<string, unknown>) {
   if (!['disable', 'verify-full'].includes(text('DATABASE_SSL', 'disable')))
     throw new Error('DATABASE_SSL invalido');
 }
+

@@ -10,7 +10,7 @@ export function configureApp(app: NestExpressApplication) {
   const settings = app.get(AuthSettings);
   if (settings.enabled)
     app.enableCors({
-      origin: settings.frontendOrigin,
+      origin: settings.frontendOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
@@ -34,3 +34,4 @@ export function configureApp(app: NestExpressApplication) {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableShutdownHooks();
 }
+
