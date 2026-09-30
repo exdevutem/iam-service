@@ -7,4 +7,6 @@ services:
       - "3002:3002"
     env_file:
       - /opt/exdev-iam-service/.env
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
 
