@@ -48,7 +48,7 @@ async function main() {
   const client=await iam.connect();
   try {
    await client.query('BEGIN');
-   const access=await client.query("UPDATE public.application_access a SET estado='habilitado',granted_by=$1,granted_at=clock_timestamp() FROM public.users u,public.applications p WHERE a.user_id=$1 AND a.application_id=$2 AND a.estado IN ('pendiente','habilitado') AND u.id=a.user_id AND u.estado='habilitado' AND p.id=a.application_id AND p.estado='habilitada' RETURNING a.user_id",[userId,found.application_id]);
+   const access=await client.query("UPDATE public.application_access a SET estado='habilitado',granted_by=$1,granted_service=NULL,grant_reason=NULL,granted_at=clock_timestamp() FROM public.users u,public.applications p WHERE a.user_id=$1 AND a.application_id=$2 AND a.estado IN ('pendiente','habilitado') AND u.id=a.user_id AND u.estado='habilitado' AND p.id=a.application_id AND p.estado='habilitada' RETURNING a.user_id",[userId,found.application_id]);
    if(access.rowCount!==1) throw new Error('ACCESS_CHANGED');
    await client.query("INSERT INTO public.audit_events(application_id,actor_service,action,target_type,target_id,resultado) VALUES($1,$2,'access.enabled_by_operator','user',$3,'exito')",[found.application_id,`local:${userInfo().username}`,userId]);
    await client.query('COMMIT');

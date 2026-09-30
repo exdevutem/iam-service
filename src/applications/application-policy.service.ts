@@ -36,13 +36,28 @@ export class ApplicationPolicyService {
   async eligible(email: string, userId?: string) {
     if (userId) {
       const member = await this.membership.findLinked(userId);
-      if (member?.estado === 'activo') return member;
+      if (member) {
+        if (member.estado !== 'activo')
+          throw new ForbiddenException('ACCESS_NOT_ENABLED');
+        return member;
+      }
     }
     const candidate = await this.membership.findCandidate(email);
     if (!candidate || candidate.estado !== 'activo' || candidate.iam_subject)
       throw new ForbiddenException('ACCESS_NOT_ENABLED');
     // A verified email only establishes eligibility to request linking, never identity ownership.
     return null;
+  }
+  async linkRafaelMember(email: string, userId: string) {
+    if (this.settings.code !== 'rafael')
+      throw new ForbiddenException('APPLICATION_UNAVAILABLE');
+    const member = await this.membership.linkVerifiedRafaelMember(
+      userId,
+      email,
+    );
+    if (!member || member.estado !== 'activo' || member.iam_subject !== userId)
+      throw new ForbiddenException('ACCESS_NOT_ENABLED');
+    return member;
   }
   async activeMember(userId: string) {
     const member = await this.membership.findLinked(userId);

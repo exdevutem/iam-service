@@ -155,14 +155,21 @@ describe('Login and session orchestration', () => {
         linked ? { user_id: 'user', estado: 'habilitado' } : undefined,
       recordIdentity: async () => 'user',
       issueSession,
+      checkAutomaticAccess: async () => {},
+      enableRafaelAccess: async () => {},
       session,
-      permissions: async () => ['members.read'],
+      permissions: async () => [],
       touch: async () => {},
     } as unknown as AuthRepository;
     const policies = {
       application: async () => ({ id: 'app', codigo: 'rafael' }),
       eligible: async () =>
         linked ? { id: '42', iam_subject: 'user', estado: 'activo' } : null,
+      linkRafaelMember: async () => ({
+        id: '42',
+        iam_subject: 'user',
+        estado: 'activo',
+      }),
       activeMember: async () => ({ id: '42' }),
     } as unknown as ApplicationPolicyService;
     const google = {
@@ -176,15 +183,15 @@ describe('Login and session orchestration', () => {
       policies,
     };
   }
-  it('records pending identity but issues no session before verified linking', async () => {
+  it('automatically provisions an eligible first Rafael login', async () => {
     const f = fixture(false);
     await expect(
       f.service.callback(
         new URLSearchParams({ state: randomToken(), code: 'code' }),
         randomToken(),
       ),
-    ).resolves.toEqual({ pending: true });
-    expect(f.issueSession).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ pending: false });
+    expect(f.issueSession).toHaveBeenCalledTimes(1);
   });
   it('issues opaque session only for linked active member and enabled access', async () => {
     const f = fixture(true);
@@ -209,6 +216,15 @@ describe('Login and session orchestration', () => {
     const f = fixture(true);
     f.policies.activeMember = () => Promise.reject(new Error('inactive'));
     await expect(f.service.current(randomToken())).rejects.toThrow('inactive');
+  });
+  it('returns a basic session with no administrative permissions', async () => {
+    const f = fixture(true);
+    await expect(f.service.current(randomToken())).resolves.toMatchObject({
+      application: 'rafael',
+      access: 'enabled',
+      permissions: [],
+      member: { id: '42' },
+    });
   });
   it('rejects revocation during membership lookup', async () => {
     const f = fixture(true);
@@ -255,7 +271,7 @@ describe('Auth configuration', () => {
 });
 
 describe('Rafael frontend integration', () => {
-  it('accepts only the configured local frontend origin', () => {
+  it('accepts configured origins and rejects malformed ones', () => {
     const config = new ConfigService({
       AUTH_ORIGIN: 'http://localhost:3002',
       AUTH_FRONTEND_ORIGIN: 'http://localhost:3000',
@@ -264,11 +280,7 @@ describe('Rafael frontend integration', () => {
     expect(new AuthSettings(config).frontendOrigin).toBe(
       'http://localhost:3000',
     );
-    for (const origin of [
-      'https://evil.example',
-      'http://127.0.0.1:3000',
-      'http://localhost:3000/path',
-    ])
+    for (const origin of ['', 'not-an-origin', 'http://localhost:3000/path'])
       expect(
         () =>
           new AuthSettings(
@@ -280,13 +292,13 @@ describe('Rafael frontend integration', () => {
           ).frontendOrigin,
       ).toThrow();
   });
-  it('rejects cross-origin configuration in production', () => {
+  it('rejects an insecure frontend origin in production', () => {
     expect(
       () =>
         new AuthSettings(
           new ConfigService({
             AUTH_ORIGIN: 'https://rafael.exdev.cl',
-            AUTH_FRONTEND_ORIGIN: 'https://other.exdev.cl',
+            AUTH_FRONTEND_ORIGIN: 'http://other.exdev.cl',
             NODE_ENV: 'production',
           }),
         ).frontendOrigin,

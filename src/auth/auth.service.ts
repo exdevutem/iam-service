@@ -89,9 +89,16 @@ export class AuthService {
     const known = await this.repository.findIdentity(identity);
     if (known?.estado === 'suspendido')
       throw new ForbiddenException('ACCESS_NOT_ENABLED');
-    const member = await this.policies.eligible(identity.email, known?.user_id);
+    const member =
+      app.codigo === 'rafael'
+        ? null
+        : await this.policies.eligible(identity.email, known?.user_id);
     const userId = await this.repository.recordIdentity(app.id, identity);
-    if (!member || member.iam_subject !== userId)
+    if (app.codigo === 'rafael') {
+      await this.repository.checkAutomaticAccess(app.id, userId);
+      await this.policies.linkRafaelMember(identity.email, userId);
+      await this.repository.enableRafaelAccess(app.id, userId);
+    } else if (!member || member.iam_subject !== userId)
       return { pending: true as const };
     await this.policies.activeMember(userId);
     const token = randomToken();
@@ -101,6 +108,7 @@ export class AuthService {
       token,
       isToken(previous) ? previous : undefined,
     );
+    await this.policies.activeMember(userId);
     return { pending: false as const, token };
   }
   async current(token: string | undefined) {

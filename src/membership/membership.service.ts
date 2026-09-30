@@ -25,7 +25,7 @@ export class MembershipService implements OnApplicationShutdown {
       connectionTimeoutMillis: 3000,
       query_timeout: 5000,
       statement_timeout: 5000,
-      application_name: 'exdev-iam-membership-read',
+      application_name: 'exdev-iam-membership',
       ssl:
         this.config.get<string>('DATABASE_SSL') === 'verify-full'
           ? {
@@ -42,6 +42,20 @@ export class MembershipService implements OnApplicationShutdown {
       const result = await this.connection().query<Member>(
         'SELECT id::text, iam_subject, estado FROM public.miembros WHERE lower(btrim(correo_institucional))=$1',
         [email],
+      );
+      return result.rows.length === 1 ? result.rows[0] : null;
+    } catch {
+      throw new ServiceUnavailableException('MEMBERSHIP_UNAVAILABLE');
+    }
+  }
+  async linkVerifiedRafaelMember(
+    userId: string,
+    email: string,
+  ): Promise<Member | null> {
+    try {
+      const result = await this.connection().query<Member>(
+        'SELECT id::text, iam_subject, estado FROM public.iam_link_verified_rafael_member($1::uuid,$2::text)',
+        [userId, email.trim().toLowerCase()],
       );
       return result.rows.length === 1 ? result.rows[0] : null;
     } catch {

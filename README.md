@@ -2,6 +2,14 @@
 
 Base NestJS 12 / TypeScript estricto / PostgreSQL con pg. Sigue el patron modular de exdev-apply-api; no copia su configuracion ni credenciales. Incluye login Google UTEM, sesiones opacas y lectura de permisos por aplicacion; administracion web y guardas de la API de negocio siguen pendientes.
 
+## Ingreso automático a Rafael — 2026-09-30
+
+Un miembro activo con correo institucional verificado por Google puede vincularse y habilitar su acceso básico automáticamente, sin aprobación manual ni concesión de roles. La política solo aplica a Rafael; no reactiva suspensiones. El vínculo y su auditoría se escriben mediante una función restringida en negocio, y la habilitación se audita en IAM como actor de servicio. Los reintentos entre ambas bases son idempotentes.
+
+Antes de activar este código, aplicar por separado `008_rafael_vinculacion_automatica_negocio.sql` en negocio y `009_rafael_acceso_automatico_iam.sql` en IAM. Están preparados, sin ejecutar, en `Knowledge/Software/ExDev/rafael`, junto con `Ingreso automatico Rafael.md`, que detalla permisos mínimos, pruebas y despliegue manual. Configurar DATABASE_URL con un login dedicado que herede `exdev_iam_membership_runtime`; no concederle el rol propietario `exdev_iam_link_owner` ni UPDATE general sobre miembros. No se modificaron secretos del entorno.
+
+Las notas de implementación anteriores que requieren link-member para el primer ingreso quedan reemplazadas para Rafael por esta política. El operador sigue disponible para excepciones.
+
 ## Arranque local
 
 Node.js 24 LTS. Ejecutar npm ci, configurar .env a partir de .env.example sin sobrescribir secretos existentes y npm run start:dev. Puerto predeterminado 3002, host 127.0.0.1. Si .env ya define PORT, ese valor prevalece. / conserva la respuesta inicial Hello World!.

@@ -102,6 +102,50 @@ export class AuthRepository {
       return userId;
     });
   }
+  async checkAutomaticAccess(appId: string, userId: string) {
+    const result = await this.db.query(
+      `SELECT a.user_id FROM public.application_access a
+       JOIN public.users u ON u.id=a.user_id
+       JOIN public.applications p ON p.id=a.application_id
+       WHERE a.application_id=$1 AND a.user_id=$2 AND p.codigo='rafael'
+         AND p.estado='habilitada' AND u.estado='habilitado'
+         AND a.estado IN ('pendiente','habilitado')`,
+      [appId, userId],
+    );
+    if (!result.rowCount) throw new ForbiddenException('ACCESS_NOT_ENABLED');
+  }
+  async enableRafaelAccess(appId: string, userId: string) {
+    await this.db.transaction(async (client) => {
+      const access = await client.query<{ estado: string }>(
+        `SELECT a.estado FROM public.application_access a
+         JOIN public.users u ON u.id=a.user_id
+         JOIN public.applications p ON p.id=a.application_id
+         WHERE a.application_id=$1 AND a.user_id=$2 AND p.codigo='rafael'
+           AND p.estado='habilitada' AND u.estado='habilitado'
+         FOR UPDATE OF a FOR SHARE OF u,p`,
+        [appId, userId],
+      );
+      if (
+        !access.rows[0] ||
+        !['pendiente', 'habilitado'].includes(access.rows[0].estado)
+      )
+        throw new ForbiddenException('ACCESS_NOT_ENABLED');
+      if (access.rows[0].estado === 'habilitado') return;
+      await client.query(
+        `UPDATE public.application_access SET estado='habilitado', granted_by=NULL,
+         granted_service='rafael-membership-policy', granted_at=clock_timestamp(),
+         grant_reason='active_member_verified_institutional_identity'
+         WHERE application_id=$1 AND user_id=$2 AND estado='pendiente'`,
+        [appId, userId],
+      );
+      await client.query(
+        `INSERT INTO public.audit_events(application_id,actor_service,action,target_type,target_id,resultado,reason)
+         VALUES($1,'rafael-membership-policy','access.auto_enabled','user',$2,'exito',
+         'active_member_verified_institutional_identity')`,
+        [appId, userId],
+      );
+    });
+  }
   async issueSession(
     appId: string,
     userId: string,
