@@ -159,6 +159,7 @@ describe('Login and session orchestration', () => {
       enableRafaelAccess: async () => {},
       session,
       permissions: async () => [],
+      roles: async () => [],
       touch: async () => {},
     } as unknown as AuthRepository;
     const policies = {
@@ -318,6 +319,8 @@ describe('Rafael frontend integration', () => {
       application: 'rafael',
       access: 'enabled',
       permissions: [],
+      roles: [],
+      accessLevel: null,
       expiresAt: new Date(),
     });
     await expect(

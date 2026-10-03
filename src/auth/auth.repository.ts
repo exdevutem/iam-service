@@ -187,10 +187,35 @@ export class AuthRepository {
     );
     if (!result.rowCount) throw new UnauthorizedException('SESSION_INVALID');
   }
-  async permissions(appId: string, userId: string) {
+  async roles(appId: string, userId: string, level?: string | null) {
+    const roleCode =
+      (
+        {
+          trainee: 'trainee_rafael',
+          miembro: 'miembro_rafael',
+          representante: 'representante_rafael',
+        } as Record<string, string>
+      )[level ?? ''] ?? null;
     const result = await this.db.query<{ codigo: string }>(
-      `SELECT DISTINCT p.codigo FROM public.user_roles ur JOIN public.access_roles r ON r.id=ur.role_id AND r.application_id=ur.application_id JOIN public.role_permissions rp ON rp.role_id=r.id AND rp.application_id=r.application_id JOIN public.permissions p ON p.id=rp.permission_id AND p.application_id=rp.application_id WHERE ur.application_id=$1 AND ur.user_id=$2 AND r.estado='activo' ORDER BY p.codigo`,
-      [appId, userId],
+      `SELECT r.codigo FROM public.access_roles r
+       JOIN public.applications p ON p.id=r.application_id
+       WHERE r.application_id=$1 AND r.estado='activo' AND (
+         (p.codigo='rafael' AND r.codigo=$3) OR
+         ((p.codigo<>'rafael' OR r.codigo NOT IN ('trainee_rafael','miembro_rafael','representante_rafael'))
+          AND EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.application_id=r.application_id AND ur.role_id=r.id AND ur.user_id=$2))
+       ) ORDER BY r.codigo`,
+      [appId, userId, roleCode],
+    );
+    return result.rows.map((row) => row.codigo);
+  }
+  async permissions(appId: string, userId: string, level?: string | null) {
+    const roles = await this.roles(appId, userId, level);
+    const result = await this.db.query<{ codigo: string }>(
+      `SELECT DISTINCT p.codigo FROM public.access_roles r
+       JOIN public.role_permissions rp ON rp.role_id=r.id AND rp.application_id=r.application_id
+       JOIN public.permissions p ON p.id=rp.permission_id AND p.application_id=rp.application_id
+       WHERE r.application_id=$1 AND r.codigo=ANY($2::text[]) AND r.estado='activo' ORDER BY p.codigo`,
+      [appId, roles],
     );
     return result.rows.map((row) => row.codigo);
   }

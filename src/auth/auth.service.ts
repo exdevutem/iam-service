@@ -119,6 +119,12 @@ export class AuthService {
     const permissions = await this.repository.permissions(
       app.id,
       session.user_id,
+      member.rafael_access_level,
+    );
+    const roles = await this.repository.roles(
+      app.id,
+      session.user_id,
+      member.rafael_access_level,
     );
     // Recheck revocation/access after the external membership read.
     await this.repository.session(app.id, token);
@@ -129,6 +135,8 @@ export class AuthService {
       application: app.codigo,
       access: 'enabled',
       permissions,
+      roles,
+      accessLevel: member.rafael_access_level ?? null,
       expiresAt: session.expires_at,
     };
   }

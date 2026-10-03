@@ -8,6 +8,7 @@ export interface Member {
   id: string;
   iam_subject: string | null;
   estado: string;
+  rafael_access_level?: 'trainee' | 'miembro' | 'representante' | null;
 }
 
 @Injectable()
@@ -65,7 +66,7 @@ export class MembershipService implements OnApplicationShutdown {
   async findLinked(userId: string): Promise<Member | null> {
     try {
       const result = await this.connection().query<Member>(
-        'SELECT id::text, iam_subject, estado FROM public.miembros WHERE iam_subject=$1',
+        'SELECT id::text, iam_subject, estado, rafael_access_level FROM public.miembros WHERE iam_subject=$1',
         [userId],
       );
       return result.rows.length === 1 ? result.rows[0] : null;
